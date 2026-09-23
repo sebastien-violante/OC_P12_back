@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
+const cors = require("cors");
 
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
@@ -10,6 +11,16 @@ const authRouter = require('./routes/auth');
 const { initialize } = require('./db');
 
 const app = express();
+
+app.use(
+  cors({
+    origin: [
+      "https://oc-p12-kasa.vercel.app",
+      "http://localhost:3000",
+    ],
+    credentials: true,
+  }),
+);
 
 app.use(logger('dev'));
 app.use(express.json());
