@@ -1,0 +1,554 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Kasa Backend API",
+    "version": "1.0.0",
+    "description": "OpenAPI 3.0 specification for the Kasa Backend API. Use /docs.html to explore and test endpoints."
+  },
+  "servers": [
+    { "url": "/", "description": "Relative server (use current host)" },
+    { "url": "http://localhost:3000", "description": "Local development" }
+  ],
+  "tags": [
+    { "name": "Auth" },
+    { "name": "Properties" },
+    { "name": "Users" },
+    { "name": "Ratings" },
+    { "name": "Favorites" },
+    { "name": "Uploads" }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user (password auth)",
+        "description": "Choisissez le rôle 'owner' ou 'client'. Par défaut: 'client' si non fourni.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 6 },
+                  "picture": { "type": "string", "nullable": true },
+                  "role": { "type": "string", "enum": ["owner", "client"], "default": "client", "description": "Choisir 'owner' ou 'client'. Si omis, 'client' sera utilisé." }
+                }
+              },
+              "examples": {
+                "registerClient": {
+                  "summary": "Inscription en tant que client",
+                  "value": { "name": "Alice", "email": "alice@example.com", "password": "secret123", "role": "client" }
+                },
+                "registerOwner": {
+                  "summary": "Inscription en tant que owner",
+                  "value": { "name": "Bob", "email": "bob@example.com", "password": "secret123", "role": "owner" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Registered", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Email already registered", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login with email and password",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Logged in", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthResponse" } } } },
+          "400": { "description": "Missing fields", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Invalid credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/auth/request-reset": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Request a password reset token",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["email"], "properties": { "email": { "type": "string", "format": "email" } } } } } },
+        "responses": {
+          "200": { "description": "Always OK (no user enumeration)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PasswordResetRequestResponse" } } } }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Reset password using a token",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["token", "password"], "properties": { "token": { "type": "string" }, "password": { "type": "string", "minLength": 6 } } } } } },
+        "responses": {
+          "200": { "description": "Password reset", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } },
+          "400": { "description": "Invalid/expired token or validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+
+    "/api/properties": {
+      "get": {
+        "tags": ["Properties"],
+        "summary": "List properties",
+        "responses": {
+          "200": { "description": "Array of properties", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PropertyBase" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Properties"],
+        "summary": "Create a property",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PropertyCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PropertyDetail" } } } },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (owner or admin role required)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Duplicate id", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/properties/{id}": {
+      "get": {
+        "tags": ["Properties"],
+        "summary": "Get property by id",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "Property details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PropertyDetail" } } } },
+          "404": { "description": "Property not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "patch": {
+        "tags": ["Properties"],
+        "summary": "Update a property",
+        "security": [ { "BearerAuth": [] } ],
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PropertyUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PropertyDetail" } } } },
+          "400": { "description": "No fields to update / validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (owner or admin role required)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Property not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Properties"],
+        "summary": "Delete a property",
+        "security": [ { "BearerAuth": [] } ],
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (owner or admin role required)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Property not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+
+    "/api/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "List users",
+        "security": [ { "BearerAuth": [] } ],
+        "responses": {
+          "200": { "description": "Array of users", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserPublic" } } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (admin only)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "tags": ["Users"],
+        "summary": "Admin: Create a user (without auth credentials)",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserCreate" } } } },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserPublic" } } } },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (admin only)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "User already exists", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get user by id (self or admin)",
+        "security": [ { "BearerAuth": [] } ],
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": {
+          "200": { "description": "User", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserPublic" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (self or admin only)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "patch": {
+        "tags": ["Users"],
+        "summary": "Update user profile (self or admin)",
+        "security": [ { "BearerAuth": [] } ],
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserUpdate" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserPublic" } } } },
+          "400": { "description": "No fields to update / validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (self or admin only; only admins can set role=admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+
+    "/api/properties/{id}/ratings": {
+      "get": {
+        "tags": ["Ratings"],
+        "summary": "List ratings for a property",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "Ratings array", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Rating" } } } } },
+          "404": { "description": "Property not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "tags": ["Ratings"],
+        "summary": "Add a rating to a property",
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RatingCreate" } } } },
+        "responses": {
+          "201": { "description": "Created and returns updated summary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RatingsSummary" } } } },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Property or User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/properties/{id}/favorite": {
+      "post": {
+        "tags": ["Favorites"],
+        "summary": "Add property to favorites (current user)",
+        "security": [ { "BearerAuth": [] } ],
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "Added (idempotent)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Property not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Favorites"],
+        "summary": "Remove property from favorites (current user)",
+        "security": [ { "BearerAuth": [] } ],
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+        "responses": {
+          "200": { "description": "Removed (idempotent)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/users/{id}/favorites": {
+      "get": {
+        "tags": ["Favorites"],
+        "summary": "List favorites for a user (self or admin)",
+        "security": [ { "BearerAuth": [] } ],
+        "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": {
+          "200": { "description": "Array of properties", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PropertyBase" } } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (self or admin)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "User not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/uploads/image": {
+      "post": {
+        "tags": ["Uploads"],
+        "summary": "Upload an image and get a URL",
+        "description": "Process: 1) Upload an image to get a public URL. 2) Use the returned URL depending on the purpose: property-cover -> PATCH /api/properties/{id} with {\n\t\"cover\": \"<url>\" }, property-picture -> include the URL in the pictures array when creating a property, user-picture -> PATCH /api/users/{id} with { \"picture\": \"<url>\" }.",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary", "description": "Image file" },
+                  "purpose": { "type": "string", "enum": ["property-cover", "property-picture", "user-picture", "other"], "description": "Optional: helps the API return tailored instructions" },
+                  "property_id": { "type": "string", "description": "Optional: property id when purpose relates to a property (validates existence)" }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Uploaded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UploadResponse" } } } },
+          "400": { "description": "Validation error (non-image or missing file)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Authentication required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden (owner or admin only)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Property not found for provided property_id", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "500": { "description": "Upload not available (multer missing)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/uploads/images": {
+      "delete": {
+        "tags": ["Uploads"],
+        "summary": "Supprimer une ou plusieurs images",
+        "description": "Fournissez des noms de fichiers (ex: \"abc.jpg\") ou des URLs (ex: \"/uploads/abc.jpg\"). L'API supprimera les fichiers et nettoiera les références en base (properties.cover, property_pictures.url, users.picture).",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filenames": { "type": "array", "items": { "type": "string" }, "description": "Liste de noms de fichiers dans /uploads" },
+                  "urls": { "type": "array", "items": { "type": "string" }, "description": "Liste d'URLs commençant par /uploads/" },
+                  "filename": { "type": "string" },
+                  "url": { "type": "string" }
+                }
+              },
+              "examples": {
+                "singleFilename": { "summary": "Un seul fichier", "value": { "filename": "1692971234-a1b2c3d4.jpg" } },
+                "multipleUrls": { "summary": "Plusieurs URLs", "value": { "urls": ["/uploads/1692971234-a1b2c3d4.jpg", "/uploads/1692971299-ffeedd.png"] } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tous supprimés", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": {"type":"boolean"}, "deleted": {"type":"array", "items": {"type":"string"}}, "not_found": {"type":"array", "items": {"type":"string"}}, "errors": {"type":"array", "items": {"type":"object", "properties": {"filename": {"type":"string"}, "error": {"type":"string"}}}}, "results": {"type":"array", "items": {"type":"object"}} } } } } },
+          "207": { "description": "Partiellement supprimés (Multi-Status)", "content": { "application/json": { "schema": { "type": "object" } } } },
+          "400": { "description": "Requête invalide (aucun élément fourni)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "401": { "description": "Authentification requise", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Interdit (owner ou admin seulement)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } },
+        "required": ["error"]
+      },
+      "Ok": {
+        "type": "object",
+        "properties": { "ok": { "type": "boolean", "example": true } },
+        "required": ["ok"]
+      },
+      "AuthUser": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email", "nullable": true },
+          "picture": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["owner", "client", "admin"] }
+        },
+        "required": ["id", "name", "role"]
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/AuthUser" }
+        },
+        "required": ["token", "user"]
+      },
+      "PasswordResetRequestResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "message": { "type": "string" },
+          "token": { "type": "string", "description": "Included only in non-production for testing" }
+        },
+        "required": ["ok", "message"]
+      },
+      "UserPublic": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "picture": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["owner", "client", "admin"] }
+        },
+        "required": ["id", "name", "role"]
+      },
+      "UserCreate": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "picture": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["owner", "client", "admin"], "default": "client" }
+        }
+      },
+      "UserUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "picture": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["owner", "client", "admin"] }
+        },
+        "additionalProperties": false
+      },
+      "PropertyHost": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "picture": { "type": "string", "nullable": true }
+        }
+      },
+      "PropertyBase": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "slug": { "type": "string", "readOnly": true, "description": "Slug unique lisible pour l'affichage" },
+          "title": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "cover": { "type": "string", "nullable": true, "description": "URL vers l'image de couverture. Pour envoyer un fichier, utilisez /api/uploads/image puis placez l'URL renvoyée ici." },
+          "location": { "type": "string", "nullable": true },
+          "price_per_night": { "type": "number" },
+          "rating_avg": { "type": "number" },
+          "ratings_count": { "type": "integer" },
+          "host": { "$ref": "#/components/schemas/PropertyHost" }
+        },
+        "required": ["id", "title", "price_per_night"]
+      },
+      "PropertyDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/PropertyBase" },
+          {
+            "type": "object",
+            "properties": {
+              "pictures": { "type": "array", "description": "Liste d'URLs d'images.", "items": { "type": "string" } },
+              "equipments": { "type": "array", "items": { "type": "string" } },
+              "tags": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        ]
+      },
+      "PropertyCreate": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Optional custom id (string)" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "cover": { "type": "string", "description": "URL vers l'image de couverture. Pour envoyer un fichier, utilisez /api/uploads/image puis placez l'URL renvoyée ici." },
+          "location": { "type": "string" },
+          "price_per_night": { "type": "number" },
+          "host_id": { "type": "integer", "description": "Existing host id" },
+          "host": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "picture": { "type": "string" }
+            }
+          },
+          "pictures": { "type": "array", "description": "Liste d'URLs d'images. Pour envoyer un fichier, utilisez /api/uploads/image puis utilisez l'URL renvoyée.", "items": { "type": "string" } },
+          "equipments": { "type": "array", "items": { "type": "string" } },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["title"]
+      },
+      "PropertyUpdate": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "cover": { "type": "string", "description": "URL vers l'image de couverture. Pour envoyer un fichier, utilisez /api/uploads/image puis placez l'URL renvoyée ici." },
+          "location": { "type": "string" },
+          "host_id": { "type": "integer" },
+          "price_per_night": { "type": "number" }
+        },
+        "additionalProperties": false
+      },
+      "Rating": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "score": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comment": { "type": "string", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "user": { "$ref": "#/components/schemas/UserPublic" }
+        },
+        "required": ["id", "score", "user"]
+      },
+      "RatingCreate": {
+        "type": "object",
+        "required": ["user_id", "score"],
+        "properties": {
+          "user_id": { "type": "integer" },
+          "score": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comment": { "type": "string" }
+        }
+      },
+      "RatingsSummary": {
+        "type": "object",
+        "properties": {
+          "rating_avg": { "type": "number" },
+          "ratings_count": { "type": "integer" },
+          "ratings": { "type": "array", "items": { "$ref": "#/components/schemas/Rating" } }
+        },
+        "required": ["rating_avg", "ratings_count", "ratings"]
+      },
+      "UploadResponse": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "description": "Public URL to the uploaded image" },
+          "filename": { "type": "string" },
+          "size": { "type": "integer" },
+          "mimetype": { "type": "string" },
+          "purpose": { "type": "string", "enum": ["property-cover", "property-picture", "user-picture", "other"], "nullable": true },
+          "property_id": { "type": "string", "nullable": true },
+          "instructions": { "type": "string", "description": "Human-readable guidance on how to use the uploaded image URL next" }
+        },
+        "required": ["url"]
+      }
+    }
+  }
+}
