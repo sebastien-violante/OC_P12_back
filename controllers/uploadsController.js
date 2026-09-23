@@ -1,74 +1,152 @@
-const path = require('path');
-const fs = require('fs');
+const path = require("path");
+const fs = require("fs");
+const cloudinary = require("cloudinary").v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 async function uploadImage(req, res) {
   let multer;
-  try {
-    multer = require('multer');
-  } catch (e) {
-    return res.status(500).json({ error: 'Upload not available: missing dependency (multer)' });
-  }
-  const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
-  try { fs.mkdirSync(uploadDir, { recursive: true }); } catch (_) {}
 
-  const storage = multer.diskStorage({
-    destination: function (req, file, cb) { cb(null, uploadDir); },
-    filename: function (req, file, cb) {
-      const ext = path.extname(file && file.originalname ? file.originalname : '').toLowerCase();
-      const base = Date.now() + '-' + Math.random().toString(16).slice(2, 10);
-      cb(null, base + ext);
-    }
-  });
+  try {
+    multer = require("multer");
+  } catch (e) {
+    return res.status(500).json({
+      error: "Upload not available: missing dependency (multer)",
+    });
+  }
+
+  // On garde le fichier en mémoire.
+  // Il ne sera donc plus écrit dans /public/uploads.
+  const storage = multer.memoryStorage();
+
   const fileFilter = function (req, file, cb) {
-    if (file && file.mimetype && file.mimetype.startsWith('image/')) return cb(null, true);
-    cb(new Error('Only image files are allowed'));
+    if (
+      file &&
+      file.mimetype &&
+      file.mimetype.startsWith("image/")
+    ) {
+      return cb(null, true);
+    }
+
+    cb(new Error("Only image files are allowed"));
   };
-  const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } }).single('file');
+
+  const upload = multer({
+    storage,
+    fileFilter,
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    },
+  }).single("file");
 
   upload(req, res, async function (err) {
-    if (err) return res.status(400).json({ error: err.message });
-    if (!req.file) return res.status(400).json({ error: 'file is required (field name "file")' });
+    if (err) {
+      return res.status(400).json({
+        error: err.message,
+      });
+    }
 
-    // Optional metadata to clarify the intent of this image
-    const purpose = (req.body && String(req.body.purpose || '').toLowerCase()) || null; // property-cover | property-picture | user-picture | other
-    const propertyId = req.body && req.body.property_id ? String(req.body.property_id) : null;
+    if (!req.file) {
+      return res.status(400).json({
+        error: 'file is required (field name "file")',
+      });
+    }
 
-    // If a property_id is provided, ensure it exists (for better UX)
-    if (propertyId) {
-      try {
-        const db = req.app.locals.db;
-        const p = await db.getAsync('SELECT id FROM properties WHERE id = ?', [propertyId]);
-        if (!p) return res.status(404).json({ error: 'Property not found for provided property_id' });
-      } catch (e) {
-        return res.status(500).json({ error: 'Validation failed: ' + e.message });
+    try {
+      // Upload du fichier en mémoire vers Cloudinary
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "kasa",
+            resource_type: "image",
+          },
+          (error, result) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(result);
+            }
+          }
+        );
+
+        uploadStream.end(req.file.buffer);
+      });
+
+      // Optional metadata
+      const purpose =
+        (req.body &&
+          String(req.body.purpose || "").toLowerCase()) ||
+        null;
+
+      const propertyId =
+        req.body && req.body.property_id
+          ? String(req.body.property_id)
+          : null;
+
+      // Si un property_id est fourni, vérifier qu'il existe
+      if (propertyId) {
+        try {
+          const db = await req.app.locals.dbPromise;
+
+          const p = await db.getAsync(
+            "SELECT id FROM properties WHERE id = ?",
+            [propertyId]
+          );
+
+          if (!p) {
+            return res.status(404).json({
+              error: "Property not found for provided property_id",
+            });
+          }
+        } catch (e) {
+          return res.status(500).json({
+            error: "Validation failed: " + e.message,
+          });
+        }
       }
-    }
 
-    // Build a simple guidance message for the client
-    const publicUrl = '/uploads/' + req.file.filename;
-    let instructions = 'Upload successful. Use the returned URL where appropriate.';
-    if (purpose === 'property-cover') {
-      instructions = propertyId
-        ? `Set as cover: PATCH /api/properties/${propertyId} with { "cover": "${publicUrl}" }`
-        : 'Set as cover of a property by PATCH /api/properties/{id} with { "cover": "<url>" }';
-    } else if (purpose === 'property-picture') {
-      instructions = propertyId
-        ? 'Add to gallery when creating/updating property data. Currently, pictures are provided when creating a property: include the URL in the pictures array.'
-        : 'Include the URL in the "pictures" array when creating a property.';
-    } else if (purpose === 'user-picture') {
-      const userId = req.user && req.user.id ? String(req.user.id) : '{yourUserId}';
-      instructions = `Set as user picture: PATCH /api/users/${userId} with { "picture": "${publicUrl}" } (self or admin)`;
-    }
+      const publicUrl = result.secure_url;
 
-    res.status(201).json({
-      url: publicUrl,
-      filename: req.file.filename,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-      purpose: purpose,
-      property_id: propertyId || undefined,
-      instructions
-    });
+      let instructions =
+        "Upload successful. Use the returned URL where appropriate.";
+
+      if (purpose === "property-cover") {
+        instructions = propertyId
+          ? `Set as cover: PATCH /api/properties/${propertyId} with { "cover": "${publicUrl}" }`
+          : 'Set as cover of a property by PATCH /api/properties/{id} with { "cover": "<url>" }';
+      } else if (purpose === "property-picture") {
+        instructions = propertyId
+          ? "Add to gallery when creating/updating property data. Currently, pictures are provided when creating a property: include the URL in the pictures array."
+          : 'Include the URL in the "pictures" array when creating a property.';
+      } else if (purpose === "user-picture") {
+        const userId =
+          req.user && req.user.id
+            ? String(req.user.id)
+            : "{yourUserId}";
+
+        instructions = `Set as user picture: PATCH /api/users/${userId} with { "picture": "${publicUrl}" } (self or admin)`;
+      }
+
+      return res.status(201).json({
+        url: publicUrl,
+        filename: result.public_id,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        purpose,
+        property_id: propertyId || undefined,
+        instructions,
+      });
+    } catch (e) {
+      console.error("Cloudinary upload failed:", e);
+
+      return res.status(500).json({
+        error: "Image upload failed",
+      });
+    }
   });
 }
 
