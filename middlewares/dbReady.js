@@ -1,5 +1,14 @@
-module.exports = function dbReady(req, res, next) {
-  const db = req.app && req.app.locals && req.app.locals.db;
-  if (!db) return res.status(503).json({ error: 'Database not ready' });
-  next();
+module.exports = async function dbReady(req, res, next) {
+  try {
+    const db = await req.app.locals.dbPromise;
+
+    if (!db) {
+      return res.status(503).json({ error: "Database not ready" });
+    }
+
+    next();
+  } catch (err) {
+    console.error("Database initialization error:", err);
+    res.status(500).json({ error: "Database initialization failed" });
+  }
 };

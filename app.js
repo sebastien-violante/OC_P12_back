@@ -18,12 +18,16 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Initialize database and expose via app.locals
-initialize().then((db) => {
-  app.locals.db = db;
-  console.log('Database initialized');
-}).catch((err) => {
-  console.error('Database initialization failed:', err);
-});
+app.locals.dbPromise = initialize()
+  .then((db) => {
+    app.locals.db = db;
+    console.log("Database initialized");
+    return db;
+  })
+  .catch((err) => {
+    console.error("Database initialization failed:", err);
+    throw err;
+  });
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
