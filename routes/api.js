@@ -33,7 +33,7 @@ router.delete(
   properties.remove,
 );
 router.get("/tags", properties.taglist);
-router.get("/equipements", properties.equipmentlist);
+router.get("/equipments", properties.equipmentlist);
 
 
 // Users
