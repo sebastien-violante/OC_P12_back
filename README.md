@@ -36,7 +36,7 @@ Le serveur est écrit avec Express 5 et persiste les données dans un fichier SQ
    - npm install
 2. Lancer le serveur:
    - npm start
-3. Le serveur écoute par défaut sur http://localhost:3000 (configurable via PORT).
+3. Le serveur écoute par défaut sur http://localhost:8000 (configurable via PORT).
 
 ## Configuration (variables d’environnement)
 - PORT: port d’écoute HTTP (par défaut 3000).
@@ -55,7 +55,7 @@ Sauvegarde: le fichier SQLite (data/kasa.sqlite3) est persistant. Pour repartir 
 
 ## Documentation API (OpenAPI)
 - Spécification: public/openapi.json
-- UI de test/exploration: http://localhost:3000/docs.html (après démarrage)
+- UI de test/exploration: http://localhost:8000/docs.html (après démarrage)
 
 Les endpoints sont groupés par tags: Auth, Properties, Users, Ratings, Favorites, Uploads. Les schémas de requête/réponse sont détaillés dans la spec.
 
