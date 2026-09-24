@@ -57,6 +57,16 @@ async function listTags(db) {
   return rows.map(row => row.name);
 }
 
+async function listEquipments(db) {
+  const rows = await db.allAsync(`
+    SELECT DISTINCT name
+    FROM property_equipments
+    ORDER BY name
+    `);
+    
+  return rows.map(row => row.name);
+}
+
 async function getPropertyDetails(db, id) {
   const row = await db.getAsync(`
     SELECT p.*, u.name AS host_name, u.picture AS host_picture
@@ -197,6 +207,7 @@ async function getPropertyOwnerId(db, id) {
 module.exports = {
   listProperties,
   listTags,
+  listEquipments,
   getPropertyDetails,
   createProperty,
   updateProperty,

@@ -1,6 +1,7 @@
 const {
   listProperties,
   listTags,
+  listEquipments,
   getPropertyDetails,
   createProperty,
   updateProperty,
@@ -27,6 +28,16 @@ async function taglist(req, res) {
   const db = req.app.locals.db;
   try {
     const rows = await listTags(db);
+    res.json(rows);
+  } catch (e) {
+    res.status(statusFromError(e)).json({ error: e.message });
+  }
+}
+
+async function equipmentlist(req, res) {
+  const db = req.app.locals.db;
+  try {
+    const rows = await listEquipments(db);
     res.json(rows);
   } catch (e) {
     res.status(statusFromError(e)).json({ error: e.message });
@@ -83,6 +94,7 @@ async function remove(req, res) {
 module.exports = {
   list,
   taglist,
+  equipmentlist,
   getById,
   create,
   update,
