@@ -5,11 +5,11 @@ async function getOrCreateConversation(db, clientId, propertyId) {
     FROM properties
     WHERE id = ?
     `,
-    [propertyId]
+    [propertyId],
   );
 
   if (!property) {
-    const error = new Error('Property not found');
+    const error = new Error("Property not found");
     error.status = 404;
     throw error;
   }
@@ -20,17 +20,17 @@ async function getOrCreateConversation(db, clientId, propertyId) {
     FROM users
     WHERE id = ?
     `,
-    [property.host_id]
+    [property.host_id],
   );
 
   if (!host) {
-    const error = new Error('Host not found');
+    const error = new Error("Host not found");
     error.status = 404;
     throw error;
   }
 
   if (Number(clientId) === Number(property.host_id)) {
-    const error = new Error('You cannot start a conversation with yourself');
+    const error = new Error("You cannot start a conversation with yourself");
     error.status = 400;
     throw error;
   }
@@ -42,7 +42,7 @@ async function getOrCreateConversation(db, clientId, propertyId) {
     WHERE property_id = ?
       AND client_id = ?
     `,
-    [propertyId, clientId]
+    [propertyId, clientId],
   );
 
   if (!conversation) {
@@ -55,7 +55,7 @@ async function getOrCreateConversation(db, clientId, propertyId) {
       )
       VALUES (?, ?, ?)
       `,
-      [propertyId, clientId, property.host_id]
+      [propertyId, clientId, property.host_id],
     );
 
     conversation = await db.getAsync(
@@ -64,7 +64,7 @@ async function getOrCreateConversation(db, clientId, propertyId) {
       FROM conversations
       WHERE id = ?
       `,
-      [result.lastID]
+      [result.lastID],
     );
   }
 
@@ -73,7 +73,7 @@ async function getOrCreateConversation(db, clientId, propertyId) {
 
     property: {
       id: conversation.property_id,
-      title: property.title
+      title: property.title,
     },
 
     clientId: conversation.client_id,
@@ -81,14 +81,13 @@ async function getOrCreateConversation(db, clientId, propertyId) {
     host: {
       id: host.id,
       name: host.name,
-      picture: host.picture
+      picture: host.picture,
     },
 
     createdAt: conversation.created_at,
-    updatedAt: conversation.updated_at
+    updatedAt: conversation.updated_at,
   };
 }
-
 
 async function listConversations(db, userId) {
   const rows = await db.allAsync(
@@ -145,10 +144,10 @@ async function listConversations(db, userId) {
 
     ORDER BY c.updated_at DESC
     `,
-    [userId, userId, userId]
+    [userId, userId, userId],
   );
 
-  return rows.map(row => {
+  return rows.map((row) => {
     const isClient = Number(row.client_id) === Number(userId);
 
     return {
@@ -156,7 +155,7 @@ async function listConversations(db, userId) {
 
       property: {
         id: row.property_id,
-        title: row.property_title
+        title: row.property_title,
       },
 
       otherUser: isClient
@@ -164,30 +163,29 @@ async function listConversations(db, userId) {
             id: row.host_id,
             name: row.host_name,
             picture: row.host_picture,
-            role: 'owner'
+            role: "owner",
           }
         : {
             id: row.client_id,
             name: row.client_name,
             picture: row.client_picture,
-            role: 'client'
+            role: "client",
           },
 
       lastMessage: row.last_message_content
         ? {
             content: row.last_message_content,
-            createdAt: row.last_message_created_at
+            createdAt: row.last_message_created_at,
           }
         : null,
 
       unreadCount: Number(row.unread_count || 0),
 
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
     };
   });
 }
-
 
 async function getConversationForUser(db, conversationId, userId) {
   const conversation = await db.getAsync(
@@ -213,11 +211,11 @@ async function getConversationForUser(db, conversationId, userId) {
         OR c.host_id = ?
       )
     `,
-    [conversationId, userId, userId]
+    [conversationId, userId, userId],
   );
 
   if (!conversation) {
-    const error = new Error('Conversation not found');
+    const error = new Error("Conversation not found");
     error.status = 404;
     throw error;
   }
@@ -225,13 +223,8 @@ async function getConversationForUser(db, conversationId, userId) {
   return conversation;
 }
 
-
 async function listMessages(db, conversationId, userId) {
-  await getConversationForUser(
-    db,
-    conversationId,
-    userId
-  );
+  await getConversationForUser(db, conversationId, userId);
 
   const rows = await db.allAsync(
     `
@@ -255,10 +248,10 @@ async function listMessages(db, conversationId, userId) {
 
     ORDER BY m.id ASC
     `,
-    [conversationId]
+    [conversationId],
   );
 
-  return rows.map(row => ({
+  return rows.map((row) => ({
     id: row.id,
 
     conversationId: row.conversation_id,
@@ -266,35 +259,30 @@ async function listMessages(db, conversationId, userId) {
     sender: {
       id: row.sender_id,
       name: row.sender_name,
-      picture: row.sender_picture
+      picture: row.sender_picture,
     },
 
     content: row.content,
 
     createdAt: row.created_at,
 
-    readAt: row.read_at
+    readAt: row.read_at,
   }));
 }
 
-
 async function sendMessage(db, conversationId, userId, content) {
-  const conversation = await getConversationForUser(
-    db,
-    conversationId,
-    userId
-  );
+  const conversation = await getConversationForUser(db, conversationId, userId);
 
-  const messageContent = String(content || '').trim();
+  const messageContent = String(content || "").trim();
 
   if (!messageContent) {
-    const error = new Error('Message content is required');
+    const error = new Error("Message content is required");
     error.status = 400;
     throw error;
   }
 
   if (messageContent.length > 5000) {
-    const error = new Error('Message is too long');
+    const error = new Error("Message is too long");
     error.status = 400;
     throw error;
   }
@@ -308,11 +296,7 @@ async function sendMessage(db, conversationId, userId, content) {
     )
     VALUES (?, ?, ?)
     `,
-    [
-      conversation.id,
-      userId,
-      messageContent
-    ]
+    [conversation.id, userId, messageContent],
   );
 
   await db.runAsync(
@@ -321,7 +305,7 @@ async function sendMessage(db, conversationId, userId, content) {
     SET updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
     `,
-    [conversation.id]
+    [conversation.id],
   );
 
   const message = await db.getAsync(
@@ -344,7 +328,7 @@ async function sendMessage(db, conversationId, userId, content) {
 
     WHERE m.id = ?
     `,
-    [result.lastID]
+    [result.lastID],
   );
 
   return {
@@ -355,25 +339,20 @@ async function sendMessage(db, conversationId, userId, content) {
     sender: {
       id: message.sender_id,
       name: message.sender_name,
-      picture: message.sender_picture
+      picture: message.sender_picture,
     },
 
     content: message.content,
 
     createdAt: message.created_at,
 
-    readAt: message.read_at
+    readAt: message.read_at,
   };
 }
 
-
 async function markConversationAsRead(db, conversationId, userId) {
   // Vérifie que l'utilisateur appartient à la conversation
-  const conversation = await getConversationForUser(
-    db,
-    conversationId,
-    userId
-  );
+  const conversation = await getConversationForUser(db, conversationId, userId);
 
   // Marque comme lus uniquement les messages
   // envoyés par l'autre personne.
@@ -385,17 +364,37 @@ async function markConversationAsRead(db, conversationId, userId) {
       AND sender_id != ?
       AND read_at IS NULL
     `,
-    [
-      conversation.id,
-      userId
-    ]
+    [conversation.id, userId],
   );
 
   return {
-    success: true
+    success: true,
   };
 }
 
+async function getConversationForProperty(db, clientId, propertyId) {
+  const conversation = await db.getAsync(
+    `
+    SELECT
+      id,
+      property_id,
+      client_id,
+      host_id,
+      created_at,
+      updated_at
+    FROM conversations
+    WHERE property_id = ?
+      AND client_id = ?
+    `,
+    [propertyId, clientId],
+  );
+
+  if (!conversation) {
+    return null;
+  }
+
+  return conversation;
+}
 
 module.exports = {
   getOrCreateConversation,
@@ -403,5 +402,6 @@ module.exports = {
   getConversationForUser,
   listMessages,
   sendMessage,
-  markConversationAsRead
+  markConversationAsRead,
+  getConversationForProperty,
 };

@@ -52,6 +52,7 @@ router.delete( "/properties/:id/favorite", requireAuth, favorites.removeForPrope
 router.get( "/users/:id/favorites", requireSelfOrAdmin("id"), favorites.listForUser);
 
 // Conversations & Messages
+router.get("/properties/:propertyId/conversation", requireAuth, messages.getPropertyConversation);
 router.get("/conversations", requireAuth, messages.list);
 router.post("/conversations", requireAuth, messages.createConversation);
 router.get("/conversations/:id/messages", requireAuth, messages.messages);
