@@ -8,6 +8,7 @@ const {
   requireSelfOrAdmin,
   requireAuth,
 } = require("../middlewares/auth");
+
 const properties = require("../controllers/propertiesController");
 const users = require("../controllers/usersController");
 const ratings = require("../controllers/ratingsController");
@@ -52,6 +53,7 @@ router.delete( "/properties/:id/favorite", requireAuth, favorites.removeForPrope
 router.get( "/users/:id/favorites", requireSelfOrAdmin("id"), favorites.listForUser);
 
 // Conversations & Messages
+
 router.get("/properties/:propertyId/conversation", requireAuth, messages.getPropertyConversation);
 router.get("/conversations", requireAuth, messages.list);
 router.post("/conversations", requireAuth, messages.createConversation);
